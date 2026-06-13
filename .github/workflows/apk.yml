@@ -1,79 +1,25 @@
-import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
-import 'dart:convert';
+name: Build APK
 
-void main() {
-  runApp(const MyApp());
-}
+on:
+  push:
+    branches: [ main ]
 
-class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+jobs:
+  build:
+    runs-on: ubuntu-latest
 
-  @override
-  Widget build(BuildContext context) {
-    return const MaterialApp(
-      home: Home(),
-      debugShowCheckedModeBanner: false,
-    );
-  }
-}
+    steps:
+      - uses: actions/checkout@v4
 
-class Home extends StatefulWidget {
-  const Home({super.key});
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.22.0'
 
-  @override
-  State<Home> createState() => _HomeState();
-}
+      - run: flutter pub get
 
-class _HomeState extends State<Home> {
-  final TextEditingController prompt = TextEditingController();
-  String output = "";
-  bool loading = false;
+      - run: flutter build apk --release --dart-define=API_KEY=${{ secrets.API_KEY }}
 
-  Future<void> generate() async {
-    setState(() {
-      loading = true;
-    });
-
-    final res = await http.post(
-      Uri.parse("https://api.replicate.com/v1/predictions"),
-      headers: {
-        "Authorization": "Token ${const String.fromEnvironment('API_KEY')}",
-        "Content-Type": "application/json",
-      },
-      body: jsonEncode({
-        "version": "MODEL_ID",
-        "input": {"prompt": prompt.text}
-      }),
-    );
-
-    setState(() {
-      output = res.body;
-      loading = false;
-    });
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text("AI Creator")),
-      body: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          children: [
-            TextField(controller: prompt),
-            const SizedBox(height: 10),
-            ElevatedButton(
-              onPressed: generate,
-              child: const Text("Genera"),
-            ),
-            const SizedBox(height: 20),
-            loading
-                ? const CircularProgressIndicator()
-                : Expanded(child: SingleChildScrollView(child: Text(output))),
-          ],
-        ),
-      ),
-    );
-  }
-}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: apk
+          path: build/app/outputs/flutter-apk/app-release.apk
